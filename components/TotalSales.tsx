@@ -1,6 +1,5 @@
-
 import React, { useMemo, useState } from 'react';
-import { Sale } from '../types';
+import { Sale, PaymentMethod } from '../types';
 import { ChartBarIcon } from './icons/ChartBarIcon';
 import { formatStandardDate, formatDisplayDate } from './dateFormatter';
 
@@ -18,10 +17,15 @@ type BreakdownData = {
 type BreakdownView = 'daily' | 'monthly' | 'quarterly' | 'yearly';
 
 const LineChart: React.FC<{ data: { [key: string]: number } }> = ({ data }) => {
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+    // FIX: Correctly handle 'unknown' type from Object.values by checking if the value is a finite number.
+    // This ensures the 'values' array is of type number[], resolving multiple downstream type errors.
+    const values = Object.values(data).map(v => (typeof v === 'number' && isFinite(v) ? v : 0));
     const labels = Object.keys(data);
-    const values = Object.values(data) as number[];
     
-    if (values.length < 2) {
+    const validDataPoints = values.filter(v => v > 0).length;
+
+    if (validDataPoints < 2) {
         return <div className="h-80 flex items-center justify-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg">Not enough data to draw a line graph. At least two data points are needed.</div>;
     }
 
@@ -31,7 +35,7 @@ const LineChart: React.FC<{ data: { [key: string]: number } }> = ({ data }) => {
     const boundedWidth = width - margin.left - margin.right;
     const boundedHeight = height - margin.top - margin.bottom;
 
-    const maxValue = values.length > 0 ? Math.max(...values) : 0;
+    const maxValue = Math.max(...values, 0);
     const yAxisMax = Math.ceil(maxValue / 1000) * 1000 || 1000;
 
     const xScale = (index: number) => margin.left + (index / (values.length - 1)) * boundedWidth;
@@ -52,7 +56,7 @@ const LineChart: React.FC<{ data: { [key: string]: number } }> = ({ data }) => {
     const labelStep = Math.max(1, Math.ceil(labels.length / maxLabels));
 
     return (
-        <div className="bg-gray-50 dark:bg-gray-800/50 p-2 rounded-lg">
+        <div className="bg-gray-50 dark:bg-gray-800/50 p-2 rounded-lg relative">
             <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
                 {/* Y Axis Gridlines & Labels */}
                 {[...Array(6)].map((_, i) => {
@@ -82,10 +86,32 @@ const LineChart: React.FC<{ data: { [key: string]: number } }> = ({ data }) => {
                 {/* Line */}
                 <path d={pathData} fill="none" className="stroke-brand-primary" strokeWidth="2" />
 
-                {/* Points */}
+                {/* Points and hover targets */}
                 {values.map((value, index) => (
-                    <circle key={index} cx={xScale(index)} cy={yScale(value)} r="3" className="fill-brand-primary" />
+                    <g key={index}>
+                      <circle cx={xScale(index)} cy={yScale(value)} r="3" className="fill-brand-primary" />
+                      <circle
+                          cx={xScale(index)}
+                          cy={yScale(value)}
+                          r="12"
+                          fill="transparent"
+                          onMouseEnter={() => setHoveredIndex(index)}
+                          onMouseLeave={() => setHoveredIndex(null)}
+                      />
+                    </g>
                 ))}
+
+                 {/* Tooltip */}
+                {hoveredIndex !== null && (
+                    <g 
+                        transform={`translate(${xScale(hoveredIndex)}, ${yScale(values[hoveredIndex])})`}
+                        className="pointer-events-none"
+                    >
+                         <rect x="-55" y="-50" width="110" height="40" rx="5" ry="5" fill="rgba(31, 41, 55, 0.85)" stroke="rgba(255,255,255,0.2)" />
+                        <text x="0" y="-33" textAnchor="middle" fill="#f9fafb" className="text-xs font-bold">{labels[hoveredIndex]}</text>
+                        <text x="0" y="-17" textAnchor="middle" fill="#d1d5db" className="text-xs font-mono">Kshs {values[hoveredIndex].toLocaleString()}</text>
+                    </g>
+                )}
             </svg>
         </div>
     );
@@ -180,7 +206,6 @@ export const TotalSales: React.FC<{ sales: Sale[] }> = ({ sales }) => {
 
       sortedSales.forEach(sale => {
           const date = new Date(sale.receiptDate);
-          let key: string | null = null;
           let displayKey: string;
 
           switch(breakdownView) {
@@ -202,6 +227,16 @@ export const TotalSales: React.FC<{ sales: Sale[] }> = ({ sales }) => {
       
       return data;
   }, [filteredSales, breakdownView]);
+
+  const paymentMethodBreakdown = useMemo(() => {
+    const breakdown: { [key in PaymentMethod]?: number } = {};
+    for (const sale of filteredSales) {
+        breakdown[sale.paymentMethod] = (breakdown[sale.paymentMethod] || 0) + sale.price;
+    }
+    return Object.entries(breakdown).sort(([, a = 0], [, b = 0]) => b - a);
+  }, [filteredSales]);
+
+  const totalSalesForPaymentBreakdown = paymentMethodBreakdown.reduce((sum, [, amount = 0]) => sum + amount, 0);
   
   const headerTitle = useMemo(() => {
     switch(breakdownView) {
@@ -272,7 +307,7 @@ export const TotalSales: React.FC<{ sales: Sale[] }> = ({ sales }) => {
         <StatCard title="Turnover Tax (1%)" amount={totals.turnoverTax} color="border-yellow-500" />
       </div>
 
-       <div className="bg-brand-surface dark:bg-[#374151] p-4 rounded-lg shadow-md">
+       <div className="bg-brand-surface dark:bg-[#374151] p-4 rounded-lg shadow-md mb-8">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Sales Over Time</h2>
         <div className="flex space-x-1 sm:space-x-2 border-b border-gray-200 dark:border-gray-700 mb-4">
             {(['daily', 'monthly', 'quarterly', 'yearly'] as BreakdownView[]).map(view => (
@@ -314,6 +349,7 @@ export const TotalSales: React.FC<{ sales: Sale[] }> = ({ sales }) => {
                         {Object.entries(breakdownData).map(([period, amount]) => (
                             <tr key={period} className="border-b border-gray-200 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                 <td className="p-2 font-medium text-gray-900 dark:text-white">{period}</td>
+                                {/* FIX: Cast 'amount' to number to resolve 'unknown' type error. */}
                                 <td className="p-2 font-mono text-gray-800 dark:text-gray-200 text-right">{new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount as number)}</td>
                             </tr>
                         ))}
@@ -324,6 +360,30 @@ export const TotalSales: React.FC<{ sales: Sale[] }> = ({ sales }) => {
             )}
         </div>
       </div>
+
+       <div className="bg-brand-surface dark:bg-[#374151] p-4 rounded-lg shadow-md">
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Sales by Payment Method</h2>
+         {paymentMethodBreakdown.length > 0 ? (
+            <div className="space-y-3">
+                {paymentMethodBreakdown.map(([method, amount = 0]) => (
+                    <div key={method}>
+                        <div className="flex justify-between items-center mb-1 text-sm">
+                            <span className="font-medium text-gray-700 dark:text-gray-300">{method}</span>
+                            <span className="font-semibold text-gray-800 dark:text-gray-200">
+                                Kshs {amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                            <div className="bg-brand-secondary h-2.5 rounded-full" style={{ width: `${totalSalesForPaymentBreakdown > 0 ? (amount / totalSalesForPaymentBreakdown) * 100 : 0}%` }}></div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+         ) : (
+             <p className="text-center text-gray-500 dark:text-gray-400 py-8">No sales data for the selected period.</p>
+         )}
+       </div>
+
     </div>
   );
 };

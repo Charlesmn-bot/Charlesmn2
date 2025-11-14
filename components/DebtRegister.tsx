@@ -96,6 +96,8 @@ const DebtCard: React.FC<{ debt: Sale; onAddPayment: () => void; onViewDetails: 
 export const DebtRegister: React.FC<DebtRegisterProps> = ({ sales, onUpdatePayment, onViewSale }) => {
   const [selectedDebt, setSelectedDebt] = useState<Sale | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [overdueNotification, setOverdueNotification] = useState<string | null>(null);
   
   const debts = useMemo(() => {
@@ -105,12 +107,24 @@ export const DebtRegister: React.FC<DebtRegisterProps> = ({ sales, onUpdatePayme
         s.customerName.toLowerCase().includes(searchQuery.toLowerCase()) || 
         (s.customerNumber && s.customerNumber.includes(searchQuery)) ||
         (s.customerIdNumber && s.customerIdNumber.includes(searchQuery)))
+      .filter(s => {
+          if (!startDate && !endDate) return true;
+          if (!s.creditDueDate) return false;
+          const dueDate = new Date(s.creditDueDate);
+          if (startDate && new Date(startDate) > dueDate) return false;
+          if (endDate) {
+              const end = new Date(endDate);
+              end.setHours(23, 59, 59, 999);
+              if (end < dueDate) return false;
+          }
+          return true;
+      })
       .sort((a, b) => {
           const dateA = a.creditDueDate ? new Date(a.creditDueDate).getTime() : 0;
           const dateB = b.creditDueDate ? new Date(b.creditDueDate).getTime() : 0;
           return dateA - dateB;
       });
-  }, [sales, searchQuery]);
+  }, [sales, searchQuery, startDate, endDate]);
   
   useEffect(() => {
     const today = new Date();
@@ -126,8 +140,9 @@ export const DebtRegister: React.FC<DebtRegisterProps> = ({ sales, onUpdatePayme
     if (overdueDebts.length > 0) {
         const alerted = sessionStorage.getItem('overdue_alerted');
         if (!alerted) {
-            const names = overdueDebts.map(d => d.customerName).join(', ');
-            setOverdueNotification(`The following customers have overdue payments: ${names}. Please follow up.`);
+            const names = overdueDebts.map(d => d.customerName).slice(0, 3).join(', ');
+            const additional = overdueDebts.length > 3 ? ` and ${overdueDebts.length - 3} others` : '';
+            setOverdueNotification(`The following customers have overdue payments: ${names}${additional}. Please follow up.`);
             sessionStorage.setItem('overdue_alerted', 'true');
         }
     }
@@ -169,18 +184,28 @@ export const DebtRegister: React.FC<DebtRegisterProps> = ({ sales, onUpdatePayme
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Debt Register</h1>
       </div>
       
-       <div className="mb-4">
+       <div className="mb-4 bg-brand-surface dark:bg-[#374151] p-3 rounded-lg shadow-sm space-y-3">
             <input
             type="text"
             placeholder="Search by name, phone, or ID #"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-brand-surface dark:bg-[#374151] border border-gray-300 dark:border-gray-600 rounded-md p-3 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition"
+            className="w-full bg-brand-bg dark:bg-[#1F2937] border border-gray-300 dark:border-gray-600 rounded-md p-3 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition"
             />
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Due Date</label>
+                    <input type="date" id="startDate" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-brand-bg dark:bg-[#1F2937] border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white"/>
+                </div>
+                <div>
+                    <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Due Date</label>
+                    <input type="date" id="endDate" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-brand-bg dark:bg-[#1F2937] border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white"/>
+                </div>
+            </div>
        </div>
 
       <div className="bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 p-4 rounded-lg shadow mb-6">
-        <h2 className="text-red-800 dark:text-red-200 text-sm font-semibold">Total Outstanding Debt</h2>
+        <h2 className="text-red-800 dark:text-red-200 text-sm font-semibold">Total Outstanding Debt (Filtered)</h2>
         <p className="text-2xl font-bold text-red-900 dark:text-red-100 mt-1">Kshs {totalDebt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
       </div>
 
@@ -197,7 +222,7 @@ export const DebtRegister: React.FC<DebtRegisterProps> = ({ sales, onUpdatePayme
         </div>
       ) : (
         <div className="text-center py-16">
-          <p className="text-gray-500 dark:text-gray-400">No outstanding debts found.</p>
+          <p className="text-gray-500 dark:text-gray-400">No outstanding debts found for the current filters.</p>
         </div>
       )}
     </div>
