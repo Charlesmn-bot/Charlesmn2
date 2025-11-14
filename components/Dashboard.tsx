@@ -79,8 +79,8 @@ export const Dashboard: React.FC<SalesDashboardProps> = ({ sales, onViewSale, on
                 <QrcodeIcon className="h-6 w-6" />
             </button>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
                 <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
                 <input
                     type="date"
@@ -91,7 +91,7 @@ export const Dashboard: React.FC<SalesDashboardProps> = ({ sales, onViewSale, on
                 />
                 {startDate && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDisplayDate(startDate)}</p>}
             </div>
-            <div className="flex-1">
+            <div>
                 <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
                 <input
                     type="date"
