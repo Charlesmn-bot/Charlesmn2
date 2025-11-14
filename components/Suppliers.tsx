@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Supplier, Purchase } from '../types';
 import { TruckIcon } from './icons/TruckIcon';
@@ -77,6 +76,22 @@ export const Suppliers: React.FC<SuppliersProps> = ({
     const [supplierId, setSupplierId] = useState(editingPurchase?.supplierId || (suppliers.length > 0 ? suppliers[0].id : ''));
     const [date, setDate] = useState(editingPurchase?.date || new Date().toISOString().split('T')[0]);
 
+    const productList = useMemo(() => {
+        const productMap = new Map<string, { cost: number }>();
+        // Sort purchases by date to easily find the latest price for a product
+        const sortedPurchases = [...purchases].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        for (const purchase of sortedPurchases) {
+            if (!productMap.has(purchase.product)) {
+                productMap.set(purchase.product, { cost: purchase.cost });
+            }
+        }
+        // Convert map to array and sort by product name for the dropdown
+        return Array.from(productMap.entries())
+            .map(([product, { cost }]) => ({ product, cost }))
+            .sort((a, b) => a.product.localeCompare(b.product));
+    }, []); // Removed `purchases` dependency to prevent list from changing while modal is open
+
     useEffect(() => {
         if (editingPurchase) {
             setItems([{
@@ -103,6 +118,22 @@ export const Suppliers: React.FC<SuppliersProps> = ({
         newItems[index] = item;
         setItems(newItems);
     };
+    
+    const handleProductSelect = (index: number, selectedProduct: string) => {
+        const newItems = [...items];
+        if (selectedProduct === 'Other' || selectedProduct === '') {
+            // Clear product and cost for user to input a new one
+            newItems[index] = { ...newItems[index], product: '', cost: 0 };
+        } else {
+            const productInfo = productList.find(p => p.product === selectedProduct);
+            if (productInfo) {
+                // Set product and autofill latest known cost
+                newItems[index] = { ...newItems[index], product: productInfo.product, cost: productInfo.cost };
+            }
+        }
+        setItems(newItems);
+    };
+
 
     const addItem = () => setItems([...items, initialItemState]);
     const removeItem = (index: number) => {
@@ -161,20 +192,23 @@ export const Suppliers: React.FC<SuppliersProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className={labelClasses}>Supplier</label>
-                            <select name="supplierId" value={supplierId} onChange={e => setSupplierId(e.target.value)} className={inputClasses} required disabled={!!editingPurchase}>
+                            <select name="supplierId" value={supplierId} onChange={e => setSupplierId(e.target.value)} className={inputClasses} required>
                                 <option value="">Select Supplier</option>
                                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                             </select>
                         </div>
                         <div>
                             <label className={labelClasses}>Date</label>
-                            <input type="date" name="date" value={date} onChange={e => setDate(e.target.value)} className={inputClasses} required disabled={!!editingPurchase}/>
+                            <input type="date" name="date" value={date} onChange={e => setDate(e.target.value)} className={inputClasses} required/>
                         </div>
                     </div>
                     <hr className="dark:border-gray-600"/>
                     <h3 className="font-semibold text-gray-800 dark:text-gray-200">Products</h3>
                     <div className="space-y-3">
-                        {items.map((item, index) => (
+                        {items.map((item, index) => {
+                            const isKnownProduct = productList.some(p => p.product === item.product);
+
+                            return (
                              <div key={index} className="bg-brand-surface dark:bg-[#374151] p-3 rounded-lg border border-gray-200 dark:border-gray-700 space-y-2 relative">
                                 {!editingPurchase && items.length > 1 && (
                                     <button type="button" onClick={() => removeItem(index)} className="absolute -top-2 -right-2 text-red-500 hover:text-red-700 bg-brand-header dark:bg-gray-700 rounded-full">
@@ -182,17 +216,35 @@ export const Suppliers: React.FC<SuppliersProps> = ({
                                     </button>
                                 )}
                                 <div>
-                                    <label className={labelClasses}>Product Name</label>
-                                    <input type="text" placeholder="e.g. iPhone 14 Screen" value={item.product} onChange={e => handleItemChange(index, 'product', e.target.value)} className={inputClasses} required />
+                                    <label className={labelClasses}>Product</label>
+                                    <select
+                                        value={isKnownProduct ? item.product : 'Other'}
+                                        onChange={e => handleProductSelect(index, e.target.value)}
+                                        className={inputClasses}
+                                    >
+                                        <option value="">Select an existing product...</option>
+                                        {productList.map(p => <option key={p.product} value={p.product}>{p.product}</option>)}
+                                        <option value="Other">Add a new product...</option>
+                                    </select>
+                                    {!isKnownProduct && (
+                                        <input
+                                            type="text"
+                                            placeholder="Enter new product name"
+                                            value={item.product}
+                                            onChange={e => handleItemChange(index, 'product', e.target.value)}
+                                            className={`${inputClasses} mt-2`}
+                                            required
+                                        />
+                                    )}
                                 </div>
                                 <div className="grid grid-cols-3 gap-2">
                                     <div>
                                         <label className={labelClasses}>Quantity</label>
-                                        <input type="number" placeholder="1" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', e.target.value)} className={inputClasses} required />
+                                        <input type="number" placeholder="1" min="1" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', e.target.value)} className={inputClasses} required />
                                     </div>
                                     <div>
                                         <label className={labelClasses}>Unit Cost</label>
-                                        <input type="number" placeholder="1000" value={item.cost} onChange={e => handleItemChange(index, 'cost', e.target.value)} className={inputClasses} required />
+                                        <input type="number" placeholder="1000" min="0" value={item.cost} onChange={e => handleItemChange(index, 'cost', e.target.value)} className={inputClasses} required />
                                     </div>
                                     <div>
                                         <label className={labelClasses}>Total Cost</label>
@@ -202,7 +254,8 @@ export const Suppliers: React.FC<SuppliersProps> = ({
                                     </div>
                                 </div>
                             </div>
-                        ))}
+                            )
+                        })}
                     </div>
 
                     {!editingPurchase && (
@@ -218,7 +271,7 @@ export const Suppliers: React.FC<SuppliersProps> = ({
                         </div>
                         <div className="flex justify-end space-x-4 pt-4">
                             <button type="button" onClick={closePurchaseModal} className="px-4 py-2 bg-brand-surface dark:bg-[#374151] border border-gray-300 dark:border-gray-500 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition">Cancel</button>
-                            <button type="submit" className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-blue-700 transition font-semibold">Save Purchase</button>
+                            <button type="submit" className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-blue-700 transition font-semibold">{editingPurchase ? 'Save Changes' : 'Save Purchase'}</button>
                         </div>
                     </div>
                 </form>
