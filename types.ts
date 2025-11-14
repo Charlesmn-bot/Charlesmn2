@@ -10,7 +10,7 @@ export enum SaleType {
   Accessory = 'Accessory',
   Repair = 'Repair',
   PhoneSale = 'Phone Sale',
-  FundiShopSale = 'Fundi Shop Sale',
+  B2B_FundiShopSale = 'B2B/Fundi Shop Sale',
 }
 
 export enum PaymentMethod {
@@ -64,6 +64,12 @@ export interface Sale {
   phoneModel?: string; 
   devicePhoto?: string;
   receivedInShop?: boolean;
+  // New fields for Credit payment
+  creditPaid?: boolean;
+  creditPaidDate?: string;
+  customerIdNumber?: string;
+  creditAmountPaid?: number;
+  creditDueDate?: string;
 }
 
 export interface Supplier {

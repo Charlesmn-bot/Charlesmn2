@@ -12,14 +12,16 @@ import { Receipt } from './components/Receipt';
 import { Login } from './components/Login';
 import { Suppliers } from './components/Suppliers';
 import { TotalSales } from './components/TotalSales';
+import { DebtRegister } from './components/DebtRegister';
 
 import { ClipboardListIcon } from './components/icons/ClipboardListIcon';
 import { PlusCircleIcon } from './components/icons/PlusCircleIcon';
 import { CogIcon } from './components/icons/CogIcon';
 import { TruckIcon } from './components/icons/TruckIcon';
 import { ChartBarIcon } from './components/icons/ChartBarIcon';
+import { CashIcon } from './components/icons/CashIcon';
 
-type Tab = 'Sales' | 'Suppliers' | 'Totals' | 'Settings';
+type Tab = 'Sales' | 'Suppliers' | 'Totals' | 'Settings' | 'Debts';
 type View = 'list' | 'form' | 'receipt' | 'scanner';
 
 const initialTechnicians: Technician[] = [
@@ -118,6 +120,32 @@ const App: React.FC = () => {
     setCurrentView('form');
   }, []);
 
+  const handleUpdateCreditPayment = useCallback((saleId: string, paymentAmount: number) => {
+    setSales(prevSales => {
+        const newSales = [...prevSales];
+        const saleIndex = newSales.findIndex(s => s.id === saleId);
+        if (saleIndex > -1) {
+            const sale = { ...newSales[saleIndex] };
+            const currentPaid = sale.creditAmountPaid || 0;
+            const newPaidAmount = currentPaid + paymentAmount;
+            
+            sale.creditAmountPaid = newPaidAmount;
+
+            if (newPaidAmount >= sale.price) {
+                sale.creditPaid = true;
+                sale.creditPaidDate = new Date().toISOString();
+            }
+            newSales[saleIndex] = sale;
+            
+            if (selectedSale && selectedSale.id === saleId) {
+                setSelectedSale(sale);
+            }
+        }
+        return newSales;
+    });
+}, [selectedSale, setSales]);
+
+
   const handleScan = useCallback((saleId: string) => {
     const foundSale = sales.find(o => o.id === saleId);
     if (foundSale) {
@@ -169,7 +197,15 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     if (currentView === 'receipt' && selectedSale) {
-      return <Receipt sale={selectedSale} onClose={resetView} onEdit={handleEditSale} technicians={technicians} currentUser={currentUser} />;
+      return <Receipt 
+                sale={selectedSale} 
+                onClose={resetView} 
+                onEdit={handleEditSale} 
+                technicians={technicians} 
+                currentUser={currentUser}
+                allSales={sales}
+                onUpdateCreditPayment={handleUpdateCreditPayment}
+             />;
     }
     if (currentView === 'form' && (saleTypeToCreate || selectedSale)) {
       return <SaleForm saleType={selectedSale?.saleType || saleTypeToCreate!} saleToEdit={selectedSale} onSave={handleSaveSale} onCancel={resetView} getNewReceiptNumber={getNewReceiptNumber} technicians={technicians} purchases={purchases}/>;
@@ -181,6 +217,12 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'Sales':
         return <Dashboard sales={sales} onViewSale={handleViewSale} onOpenScanner={handleOpenScanner} />;
+      case 'Debts':
+        return <DebtRegister 
+                    sales={sales} 
+                    onUpdatePayment={handleUpdateCreditPayment} 
+                    onViewSale={handleViewSale} 
+                />;
       case 'Suppliers':
         return <Suppliers 
                     suppliers={suppliers} 
@@ -217,6 +259,7 @@ const App: React.FC = () => {
   const navItems = [
     { name: 'Sales' as Tab, icon: ClipboardListIcon },
     { name: 'Totals' as Tab, icon: ChartBarIcon },
+    { name: 'Debts' as Tab, icon: CashIcon },
     { name: 'Suppliers' as Tab, icon: TruckIcon },
     { name: 'Settings' as Tab, icon: CogIcon },
   ];
@@ -270,7 +313,7 @@ const App: React.FC = () => {
       
       {isCreatingSale && <SaleTypeSelectorModal />}
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-brand-header dark:bg-[#111827] border-t border-gray-200 dark:border-gray-700 grid grid-cols-4">
+      <nav className="fixed bottom-0 left-0 right-0 bg-brand-header dark:bg-[#111827] border-t border-gray-200 dark:border-gray-700 grid grid-cols-5">
         {navItems.map(item => {
           const Icon = item.icon;
           const isActive = activeTab === item.name;

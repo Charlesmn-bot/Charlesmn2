@@ -11,7 +11,7 @@ interface SalesDashboardProps {
 }
 
 const statusFilters: (Status | 'All')[] = ['All', Status.Pending, Status.InProgress, Status.Completed, Status.Collected];
-const saleTypeFilters: (SaleType | 'All')[] = ['All', SaleType.Accessory, SaleType.Repair, SaleType.PhoneSale, SaleType.FundiShopSale];
+const saleTypeFilters: (SaleType | 'All')[] = ['All', SaleType.Accessory, SaleType.Repair, SaleType.PhoneSale, SaleType.B2B_FundiShopSale];
 
 
 export const Dashboard: React.FC<SalesDashboardProps> = ({ sales, onViewSale, onOpenScanner }) => {

@@ -54,7 +54,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
       if (saleToEdit.saleType === SaleType.Accessory && !ACCESSORY_PRODUCTS.includes(saleToEdit.phoneType)) {
         saleData.phoneType = 'Other';
         setOtherItemName(saleToEdit.phoneType);
-      } else if (saleToEdit.saleType === SaleType.FundiShopSale && !sparePartsList.includes(saleToEdit.phoneType)) {
+      } else if (saleToEdit.saleType === SaleType.B2B_FundiShopSale && !sparePartsList.includes(saleToEdit.phoneType)) {
         saleData.phoneType = 'Other';
         setOtherItemName(saleToEdit.phoneType);
       } else {
@@ -141,7 +141,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
     setOtherRepair('');
     setSale(prev => {
         const newState: Partial<Sale> = { ...prev, saleType: newType, phoneType: '', phoneModel: '' };
-        if (newType === SaleType.Accessory || newType === SaleType.FundiShopSale) {
+        if (newType === SaleType.Accessory || newType === SaleType.B2B_FundiShopSale) {
             delete newState.repairType;
             delete newState.assignedTechnician;
             delete newState.estimatedRepairTime;
@@ -163,7 +163,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
             newState.status = Status.Completed;
         }
 
-        if (newType === SaleType.Accessory || newType === SaleType.Repair || newType === SaleType.FundiShopSale) {
+        if (newType === SaleType.Accessory || newType === SaleType.Repair || newType === SaleType.B2B_FundiShopSale) {
             newState.paymentMethod = PaymentMethod.Cash;
             delete newState.lipaMdogoMdogoPlan;
             delete newState.lipaMdogoMdogoAmount;
@@ -186,7 +186,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
 
     let finalValue: any = value;
 
-    if (name === 'price' || name === 'lipaMdogoMdogoAmount') finalValue = parseFloat(value) || 0;
+    if (name === 'price' || name === 'lipaMdogoMdogoAmount' || name === 'creditAmountPaid') finalValue = parseFloat(value) || 0;
     if (name === 'receivedInShop') finalValue = value === 'true';
     if (type === 'checkbox' && e.target instanceof HTMLInputElement) finalValue = e.target.checked;
     
@@ -200,6 +200,11 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
                 delete newState.lipaMdogoMdogoAmount;
             }
             if (value !== PaymentMethod.Onfone) delete newState.onfoneTransactionId;
+            if (value !== PaymentMethod.Credit) {
+                delete newState.customerIdNumber;
+                delete newState.creditDueDate;
+                delete newState.creditAmountPaid;
+            }
         }
 
         if (name === 'phoneType' && prev.phoneType !== value) {
@@ -213,7 +218,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if ((sale.saleType === SaleType.Accessory || sale.saleType === SaleType.FundiShopSale) && sale.phoneType === 'Other' && !otherItemName.trim()) {
+    if ((sale.saleType === SaleType.Accessory || sale.saleType === SaleType.B2B_FundiShopSale) && sale.phoneType === 'Other' && !otherItemName.trim()) {
       alert('Please specify the product name in the "Other" field.');
       return;
     }
@@ -226,7 +231,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
     if (sale.customerName && (sale.phoneType || otherItemName) && (sale.price || 0) >= 0 && sale.saleType) {
        const saleDataForSave = { ...sale };
 
-      if ((sale.saleType === SaleType.Accessory || sale.saleType === SaleType.FundiShopSale) && sale.phoneType === 'Other') {
+      if ((sale.saleType === SaleType.Accessory || sale.saleType === SaleType.B2B_FundiShopSale) && sale.phoneType === 'Other') {
         saleDataForSave.phoneType = otherItemName.trim();
       }
       if (sale.saleType === SaleType.Repair && sale.repairType === 'Other') {
@@ -260,7 +265,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
   const getTitle = () => {
       if(saleToEdit) return `Edit ${sale.saleType} Sale`;
       if (sale.saleType === SaleType.PhoneSale) return 'New Phone Sale';
-      if (sale.saleType === SaleType.FundiShopSale) return 'New Fundi Shop Sale';
+      if (sale.saleType === SaleType.B2B_FundiShopSale) return 'New B2B/Fundi Shop Sale';
       return `New ${sale.saleType} Sale`;
   }
   
@@ -268,13 +273,13 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
 
   const paymentOptions = useMemo(() => {
     switch (sale.saleType) {
-      case SaleType.FundiShopSale:
+      case SaleType.B2B_FundiShopSale:
+      case SaleType.Repair:
         return [PaymentMethod.Cash, PaymentMethod.Mpesa, PaymentMethod.Credit];
       case SaleType.Accessory:
-      case SaleType.Repair:
         return [PaymentMethod.Cash, PaymentMethod.Mpesa];
       case SaleType.PhoneSale:
-        return [PaymentMethod.Cash, PaymentMethod.Mpesa, PaymentMethod.LipaMdogoMdogo, PaymentMethod.Onfone];
+        return [PaymentMethod.Cash, PaymentMethod.Mpesa, PaymentMethod.LipaMdogoMdogo, PaymentMethod.Onfone, PaymentMethod.Credit];
       default:
         return [PaymentMethod.Cash, PaymentMethod.Mpesa];
     }
@@ -298,12 +303,10 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
             <label htmlFor="customerName" className={labelClasses}>Customer Name</label>
             <input type="text" id="customerName" name="customerName" value={sale.customerName} onChange={handleChange} className={inputClasses} required />
         </div>
-        {isPhoneBasedSale && (
-            <div>
-                <label htmlFor="customerNumber" className={labelClasses}>Customer Number</label>
-                <input type="tel" id="customerNumber" name="customerNumber" value={sale.customerNumber || ''} onChange={handleChange} className={inputClasses} placeholder="e.g. 0712345678" />
-            </div>
-        )}
+        <div>
+            <label htmlFor="customerNumber" className={labelClasses}>Customer Number</label>
+            <input type="tel" id="customerNumber" name="customerNumber" value={sale.customerNumber || ''} onChange={handleChange} className={inputClasses} placeholder="e.g. 0712345678" />
+        </div>
       </div>
 
       {isPhoneBasedSale && (
@@ -325,7 +328,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
         </div>
       )}
 
-      {(sale.saleType === SaleType.Accessory || sale.saleType === SaleType.FundiShopSale) && (
+      {(sale.saleType === SaleType.Accessory || sale.saleType === SaleType.B2B_FundiShopSale) && (
         <div>
             <label htmlFor="phoneType" className={labelClasses}>
                 {sale.saleType === SaleType.Accessory ? 'Accessory Product' : 'Repair Spare'}
@@ -411,7 +414,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label htmlFor="price" className={labelClasses}>Price (Kshs)</label>
-          <input type="number" id="price" name="price" value={sale.price} onChange={handleChange} className={inputClasses} required />
+          <input type="number" id="price" name="price" value={sale.price} onChange={handleChange} onFocus={(e) => e.target.select()} className={inputClasses} required />
         </div>
         {sale.saleType === SaleType.Repair && (
             <div>
@@ -453,7 +456,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
                     </div>
                     <div>
                         <label htmlFor="lipaMdogoMdogoAmount" className={labelClasses}>Installment Amount (Kshs)</label>
-                        <input type="number" id="lipaMdogoMdogoAmount" name="lipaMdogoMdogoAmount" value={sale.lipaMdogoMdogoAmount || ''} onChange={handleChange} className={inputClasses} />
+                        <input type="number" id="lipaMdogoMdogoAmount" name="lipaMdogoMdogoAmount" value={sale.lipaMdogoMdogoAmount || ''} onChange={handleChange} onFocus={(e) => e.target.select()} className={inputClasses} />
                     </div>
                 </div>
             )}
@@ -463,6 +466,23 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
                     <label htmlFor="onfoneTransactionId" className={labelClasses}>Onfone Transaction ID</label>
                     <input type="text" id="onfoneTransactionId" name="onfoneTransactionId" value={sale.onfoneTransactionId || ''} onChange={handleChange} className={inputClasses} placeholder="Enter Transaction ID" />
                 </div>
+            )}
+
+            {sale.paymentMethod === PaymentMethod.Credit && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                  <div>
+                      <label htmlFor="customerIdNumber" className={labelClasses}>Customer ID Number</label>
+                      <input type="text" id="customerIdNumber" name="customerIdNumber" value={sale.customerIdNumber || ''} onChange={handleChange} className={inputClasses} />
+                  </div>
+                  <div>
+                      <label htmlFor="creditDueDate" className={labelClasses}>Due Date</label>
+                      <input type="date" id="creditDueDate" name="creditDueDate" value={sale.creditDueDate || ''} onChange={handleChange} className={inputClasses} />
+                  </div>
+                  <div className="md:col-span-2">
+                      <label htmlFor="creditAmountPaid" className={labelClasses}>Amount Paid (Initial)</label>
+                      <input type="number" id="creditAmountPaid" name="creditAmountPaid" value={sale.creditAmountPaid || 0} onChange={handleChange} onFocus={(e) => e.target.select()} className={inputClasses} />
+                  </div>
+              </div>
             )}
         </div>
 
