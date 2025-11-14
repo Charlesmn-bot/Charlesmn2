@@ -38,8 +38,8 @@ const initialSuppliers: Supplier[] = [
 ];
 
 const initialPurchases: Purchase[] = [
-    { id: 'pur1', supplierId: 'sup1', product: 'iPhone 13 Screens', cost: 12000, totalCost: 60000, date: '2023-10-20' },
-    { id: 'pur2', supplierId: 'sup2', product: 'Samsung Chargers', cost: 500, totalCost: 10000, date: '2023-10-22' },
+    { id: 'pur1', supplierId: 'sup1', product: 'iPhone 13 Screens', cost: 12000, quantity: 5, totalCost: 60000, date: '2023-10-20' },
+    { id: 'pur2', supplierId: 'sup2', product: 'Samsung Chargers', cost: 500, quantity: 20, totalCost: 10000, date: '2023-10-22' },
 ];
 
 const initialSales: Sale[] = [
@@ -172,7 +172,7 @@ const App: React.FC = () => {
       return <Receipt sale={selectedSale} onClose={resetView} onEdit={handleEditSale} technicians={technicians} currentUser={currentUser} />;
     }
     if (currentView === 'form' && (saleTypeToCreate || selectedSale)) {
-      return <SaleForm saleType={selectedSale?.saleType || saleTypeToCreate!} saleToEdit={selectedSale} onSave={handleSaveSale onCancel={resetView} getNewReceiptNumber={getNewReceiptNumber} technicians={technicians}/>;
+      return <SaleForm saleType={selectedSale?.saleType || saleTypeToCreate!} saleToEdit={selectedSale} onSave={handleSaveSale} onCancel={resetView} getNewReceiptNumber={getNewReceiptNumber} technicians={technicians}/>;
     }
     if (currentView === 'scanner') {
         return <Scanner onScan={handleScan} onClose={resetView} />;

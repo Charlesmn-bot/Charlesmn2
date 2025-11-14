@@ -74,7 +74,8 @@ export interface Purchase {
   id:string;
   supplierId: string;
   product: string;
-  cost: number;
+  cost: number; // Unit Cost
+  quantity: number;
   totalCost: number;
   receiptUrl?: string;
   date: string;
