@@ -1,0 +1,7 @@
+{
+  "name": "GSM Arena POS",
+  "description": "A modern, mobile-first POS and repair tracking application for GSM Arena (Kwa Njoroo) mobile phone repair shop. It helps manage sales, track repairs, and generate receipts with QR codes.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
