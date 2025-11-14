@@ -478,9 +478,15 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
                       <label htmlFor="creditDueDate" className={labelClasses}>Due Date</label>
                       <input type="date" id="creditDueDate" name="creditDueDate" value={sale.creditDueDate || ''} onChange={handleChange} className={inputClasses} />
                   </div>
-                  <div className="md:col-span-2">
+                  <div>
                       <label htmlFor="creditAmountPaid" className={labelClasses}>Amount Paid (Initial)</label>
                       <input type="number" id="creditAmountPaid" name="creditAmountPaid" value={sale.creditAmountPaid || 0} onChange={handleChange} onFocus={(e) => e.target.select()} className={inputClasses} />
+                  </div>
+                  <div>
+                      <label className={labelClasses}>Remaining Balance</label>
+                      <div className="w-full bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white font-semibold">
+                          Kshs {((sale.price || 0) - (sale.creditAmountPaid || 0)).toLocaleString()}
+                      </div>
                   </div>
               </div>
             )}
