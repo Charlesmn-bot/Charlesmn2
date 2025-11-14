@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Supplier, Purchase } from '../types';
 import { TruckIcon } from './icons/TruckIcon';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
-import { formatStandardDate } from './dateFormatter';
+import { formatStandardDate, formatDisplayDate } from './dateFormatter';
 
 interface SuppliersProps {
   suppliers: Supplier[];
@@ -30,20 +30,22 @@ export const Suppliers: React.FC<SuppliersProps> = ({
 }) => {
   const [isPurchaseModalOpen, setPurchaseModalOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
+  const [preselectedSupplierId, setPreselectedSupplierId] = useState<string | null>(null);
 
   const [isSupplierModalOpen, setSupplierModalOpen] = useState(false);
 
-  const [filterBySupplier, setFilterBySupplier] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
-  const getSupplierName = (supplierId: string) => suppliers.find(s => s.id === supplierId)?.name || 'Unknown';
-
-  const openPurchaseModal = (purchase: Purchase | null = null) => {
+  const openPurchaseModal = (purchase: Purchase | null = null, supplierId: string | null = null) => {
     setEditingPurchase(purchase);
+    setPreselectedSupplierId(supplierId);
     setPurchaseModalOpen(true);
   };
   const closePurchaseModal = () => {
     setEditingPurchase(null);
+    setPreselectedSupplierId(null);
     setPurchaseModalOpen(false);
   };
 
@@ -54,17 +56,40 @@ export const Suppliers: React.FC<SuppliersProps> = ({
     setSupplierModalOpen(false);
   };
 
-  const filteredAndSortedPurchases = useMemo(() => {
-    return purchases
-      .filter(p => filterBySupplier === 'all' || p.supplierId === filterBySupplier)
-      .sort((a, b) => {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-        return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
-      });
-  }, [purchases, filterBySupplier, sortOrder]);
+  const purchasesBySupplier = useMemo(() => {
+    const grouped = new Map<string, Purchase[]>();
+    suppliers.forEach(supplier => grouped.set(supplier.id, []));
 
-  const PurchaseModal: React.FC = () => {
+    const dateFilteredPurchases = purchases.filter(p => {
+        if (!startDate && !endDate) return true;
+        const purchaseDate = new Date(p.date);
+        if (startDate && new Date(startDate) > purchaseDate) return false;
+        if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            if (end < purchaseDate) return false;
+        }
+        return true;
+    });
+
+    dateFilteredPurchases.forEach(p => {
+        if (grouped.has(p.supplierId)) {
+            grouped.get(p.supplierId)!.push(p);
+        }
+    });
+
+    for (const purchaseList of grouped.values()) {
+        purchaseList.sort((a, b) => {
+            const dateA = new Date(a.date).getTime();
+            const dateB = new Date(b.date).getTime();
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+    }
+    return grouped;
+  }, [purchases, suppliers, startDate, endDate, sortOrder]);
+
+
+  const PurchaseModal: React.FC<{initialSupplierId?: string | null}> = ({ initialSupplierId }) => {
     interface PurchaseItem {
         product: string;
         cost: number; // Unit Cost
@@ -73,24 +98,21 @@ export const Suppliers: React.FC<SuppliersProps> = ({
     const initialItemState: PurchaseItem = { product: '', cost: 0, quantity: 1 };
     
     const [items, setItems] = useState<PurchaseItem[]>([initialItemState]);
-    const [supplierId, setSupplierId] = useState(editingPurchase?.supplierId || (suppliers.length > 0 ? suppliers[0].id : ''));
+    const [supplierId, setSupplierId] = useState(editingPurchase?.supplierId || initialSupplierId || (suppliers.length > 0 ? suppliers[0].id : ''));
     const [date, setDate] = useState(editingPurchase?.date || new Date().toISOString().split('T')[0]);
 
     const productList = useMemo(() => {
         const productMap = new Map<string, { cost: number }>();
-        // Sort purchases by date to easily find the latest price for a product
         const sortedPurchases = [...purchases].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
         for (const purchase of sortedPurchases) {
             if (!productMap.has(purchase.product)) {
                 productMap.set(purchase.product, { cost: purchase.cost });
             }
         }
-        // Convert map to array and sort by product name for the dropdown
         return Array.from(productMap.entries())
             .map(([product, { cost }]) => ({ product, cost }))
             .sort((a, b) => a.product.localeCompare(b.product));
-    }, []); // Removed `purchases` dependency to prevent list from changing while modal is open
+    }, []);
 
     useEffect(() => {
         if (editingPurchase) {
@@ -112,7 +134,6 @@ export const Suppliers: React.FC<SuppliersProps> = ({
             item[field] = value as string;
         } else {
             const numValue = Number(value);
-            // Prevent negative numbers for cost and quantity
             item[field] = numValue < 0 ? 0 : numValue;
         }
         newItems[index] = item;
@@ -122,18 +143,15 @@ export const Suppliers: React.FC<SuppliersProps> = ({
     const handleProductSelect = (index: number, selectedProduct: string) => {
         const newItems = [...items];
         if (selectedProduct === 'Other' || selectedProduct === '') {
-            // Clear product and cost for user to input a new one
             newItems[index] = { ...newItems[index], product: '', cost: 0 };
         } else {
             const productInfo = productList.find(p => p.product === selectedProduct);
             if (productInfo) {
-                // Set product and autofill latest known cost
                 newItems[index] = { ...newItems[index], product: productInfo.product, cost: productInfo.cost };
             }
         }
         setItems(newItems);
     };
-
 
     const addItem = () => setItems([...items, initialItemState]);
     const removeItem = (index: number) => {
@@ -180,7 +198,6 @@ export const Suppliers: React.FC<SuppliersProps> = ({
     };
 
     const grandTotal = useMemo(() => items.reduce((total, item) => total + (item.cost * item.quantity), 0), [items]);
-    
     const inputClasses = "w-full bg-brand-surface dark:bg-[#374151] border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition";
     const labelClasses = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
 
@@ -207,7 +224,6 @@ export const Suppliers: React.FC<SuppliersProps> = ({
                     <div className="space-y-3">
                         {items.map((item, index) => {
                             const isKnownProduct = productList.some(p => p.product === item.product);
-
                             return (
                              <div key={index} className="bg-brand-surface dark:bg-[#374151] p-3 rounded-lg border border-gray-200 dark:border-gray-700 space-y-2 relative">
                                 {!editingPurchase && items.length > 1 && (
@@ -217,25 +233,12 @@ export const Suppliers: React.FC<SuppliersProps> = ({
                                 )}
                                 <div>
                                     <label className={labelClasses}>Product</label>
-                                    <select
-                                        value={isKnownProduct ? item.product : 'Other'}
-                                        onChange={e => handleProductSelect(index, e.target.value)}
-                                        className={inputClasses}
-                                    >
+                                    <select value={isKnownProduct ? item.product : 'Other'} onChange={e => handleProductSelect(index, e.target.value)} className={inputClasses}>
                                         <option value="">Select an existing product...</option>
                                         {productList.map(p => <option key={p.product} value={p.product}>{p.product}</option>)}
                                         <option value="Other">Add a new product...</option>
                                     </select>
-                                    {!isKnownProduct && (
-                                        <input
-                                            type="text"
-                                            placeholder="Enter new product name"
-                                            value={item.product}
-                                            onChange={e => handleItemChange(index, 'product', e.target.value)}
-                                            className={`${inputClasses} mt-2`}
-                                            required
-                                        />
-                                    )}
+                                    {!isKnownProduct && ( <input type="text" placeholder="Enter new product name" value={item.product} onChange={e => handleItemChange(index, 'product', e.target.value)} className={`${inputClasses} mt-2`} required /> )}
                                 </div>
                                 <div className="grid grid-cols-3 gap-2">
                                     <div>
@@ -248,22 +251,14 @@ export const Suppliers: React.FC<SuppliersProps> = ({
                                     </div>
                                     <div>
                                         <label className={labelClasses}>Total Cost</label>
-                                        <p className="w-full bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white font-mono">
-                                            {(item.cost * item.quantity).toLocaleString()}
-                                        </p>
+                                        <p className="w-full bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white font-mono">{(item.cost * item.quantity).toLocaleString()}</p>
                                     </div>
                                 </div>
                             </div>
                             )
                         })}
                     </div>
-
-                    {!editingPurchase && (
-                        <button type="button" onClick={addItem} className="w-full flex items-center justify-center gap-2 text-sm p-2 bg-brand-surface dark:bg-[#374151] hover:bg-gray-100 dark:hover:bg-gray-600 border border-dashed border-gray-400 dark:border-gray-500 rounded-md transition">
-                           <PlusCircleIcon className="h-5 w-5"/> Add Another Product
-                        </button>
-                    )}
-                    
+                    {!editingPurchase && ( <button type="button" onClick={addItem} className="w-full flex items-center justify-center gap-2 text-sm p-2 bg-brand-surface dark:bg-[#374151] hover:bg-gray-100 dark:hover:bg-gray-600 border border-dashed border-gray-400 dark:border-gray-500 rounded-md transition"><PlusCircleIcon className="h-5 w-5"/> Add Another Product</button> )}
                     <div className="pt-4 mt-auto">
                         <div className="flex justify-between items-center bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
                             <span className="font-bold text-lg text-gray-800 dark:text-gray-100">Grand Total</span>
@@ -290,18 +285,15 @@ export const Suppliers: React.FC<SuppliersProps> = ({
         setSupplierData({ name: supplier.name, contact: supplier.contact });
         setFormVisible(true);
     }
-    
     const handleAddNewClick = () => {
         setEditingSup(null);
         setSupplierData({ name: '', contact: '' });
         setFormVisible(true);
     }
-
     const handleCancel = () => {
         setEditingSup(null);
         setFormVisible(false);
     }
-
     const handleSaveSupplier = () => {
         if (!supplierData.name) {
             alert('Supplier name is required.');
@@ -314,7 +306,6 @@ export const Suppliers: React.FC<SuppliersProps> = ({
         }
         handleCancel();
     }
-    
     const handleDeleteSupplier = (id: string) => {
         if (window.confirm('Are you sure you want to delete this supplier? This will not delete their past purchases.')) {
             onDeleteSupplier(id);
@@ -322,12 +313,10 @@ export const Suppliers: React.FC<SuppliersProps> = ({
     }
 
     const inputClasses = "w-full bg-brand-surface dark:bg-[#374151] border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition";
-
     return (
          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
             <div className="bg-brand-header dark:bg-[#111827] rounded-lg shadow-xl p-5 w-full max-w-md max-h-[80vh] flex flex-col">
                 <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Manage Suppliers</h2>
-                
                 <div className="flex-1 overflow-y-auto">
                     {!isFormVisible ? (
                         <>
@@ -366,59 +355,85 @@ export const Suppliers: React.FC<SuppliersProps> = ({
   }
 
   return (
-    <div className="p-3">
-      {isPurchaseModalOpen && <PurchaseModal />}
+    <div className="p-3 pb-24">
+      {isPurchaseModalOpen && <PurchaseModal initialSupplierId={preselectedSupplierId} />}
       {isSupplierModalOpen && <SupplierManagerModal />}
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Suppliers & Purchases</h1>
 
-      <div className="bg-brand-surface dark:bg-[#374151] p-3 rounded-lg mb-4 space-y-3 md:space-y-0 md:flex md:justify-between md:items-center">
-         <div className="flex items-center space-x-2">
-            <select value={filterBySupplier} onChange={e => setFilterBySupplier(e.target.value)} className="bg-brand-header dark:bg-[#111827] border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white">
-                <option value="all">All Suppliers</option>
-                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-            <select value={sortOrder} onChange={e => setSortOrder(e.target.value as SortOrder)} className="bg-brand-header dark:bg-[#111827] border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white">
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-            </select>
-         </div>
-         <div className="flex items-center space-x-2">
-            <button onClick={openSupplierModal} className="bg-brand-secondary text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-700 transition text-sm">Manage Suppliers</button>
-            <button onClick={() => openPurchaseModal()} className="bg-brand-primary text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition text-sm">Add Purchase</button>
-         </div>
+      <div className="bg-brand-surface dark:bg-[#374151] p-3 rounded-lg mb-4 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                  <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
+                  <input type="date" id="startDate" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-brand-header dark:bg-[#1F2937] border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white"/>
+                  {startDate && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDisplayDate(startDate)}</p>}
+              </div>
+              <div>
+                  <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
+                  <input type="date" id="endDate" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-brand-header dark:bg-[#1F2937] border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white"/>
+                  {endDate && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDisplayDate(endDate)}</p>}
+              </div>
+          </div>
+          <div className="flex items-center space-x-2">
+              <label htmlFor="sortOrder" className="text-sm font-medium text-gray-700 dark:text-gray-300">Sort by:</label>
+              <select id="sortOrder" value={sortOrder} onChange={e => setSortOrder(e.target.value as SortOrder)} className="bg-brand-header dark:bg-[#1F2937] border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white">
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+              </select>
+          </div>
+          <div className="pt-3 border-t border-gray-200 dark:border-gray-600 flex items-center space-x-2">
+              <button onClick={openSupplierModal} className="flex-1 bg-brand-secondary text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-700 transition text-sm">Manage Suppliers</button>
+              <button onClick={() => openPurchaseModal()} className="flex-1 bg-brand-primary text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition text-sm">Add General Purchase</button>
+          </div>
       </div>
       
-      <div className="space-y-3">
-        {filteredAndSortedPurchases.length > 0 ? filteredAndSortedPurchases.map((purchase) => (
-          <div key={purchase.id} className="bg-brand-surface dark:bg-[#374151] p-3 rounded-lg flex items-start space-x-3">
-            <div className="bg-brand-secondary p-3 rounded-full mt-1">
-              <TruckIcon className="h-6 w-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <div className="flex justify-between items-start">
-                <div>
-                    <p className="text-lg font-medium text-gray-900 dark:text-white">{purchase.product}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">from {getSupplierName(purchase.supplierId)}</p>
+      <div className="space-y-4">
+        {suppliers.sort((a,b) => a.name.localeCompare(b.name)).map((supplier) => {
+            const supplierPurchases = purchasesBySupplier.get(supplier.id) || [];
+            const totalSpent = supplierPurchases.reduce((sum, p) => sum + p.totalCost, 0);
+
+            return (
+                <div key={supplier.id} className="bg-brand-surface dark:bg-[#374151] p-3 rounded-lg shadow-sm">
+                    <div className="border-b border-gray-200 dark:border-gray-600 pb-3 mb-3">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">{supplier.name}</h2>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">{supplier.contact}</p>
+                            </div>
+                            <div className="text-right flex-shrink-0 ml-4">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Total (period)</p>
+                                <p className="font-bold text-gray-900 dark:text-white text-lg">Kshs {totalSpent.toLocaleString()}</p>
+                            </div>
+                        </div>
+                        <button onClick={() => openPurchaseModal(null, supplier.id)} className="mt-2 text-sm inline-flex items-center gap-1 text-brand-primary hover:underline">
+                            <PlusCircleIcon className="h-4 w-4"/> Add Purchase
+                        </button>
+                    </div>
+
+                    <div className="space-y-2">
+                        {supplierPurchases.length > 0 ? supplierPurchases.map(purchase => (
+                             <div key={purchase.id} className="bg-brand-bg dark:bg-[#374151]/50 p-2 rounded-md">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="font-semibold text-gray-800 dark:text-gray-200">{purchase.product}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">{purchase.quantity} units @ {purchase.cost.toLocaleString()} each</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-semibold text-gray-800 dark:text-gray-200">Kshs {purchase.totalCost.toLocaleString()}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatStandardDate(purchase.date)}</p>
+                                    </div>
+                                </div>
+                                 <div className="text-right mt-1 space-x-2">
+                                    <button onClick={() => openPurchaseModal(purchase, supplier.id)} className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-xs font-medium">Edit</button>
+                                    <button onClick={() => {if (window.confirm('Delete this purchase record?')) onDeletePurchase(purchase.id)}} className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 text-xs font-medium">Delete</button>
+                                 </div>
+                             </div>
+                        )) : (
+                            <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-4">No purchases found for this supplier in the selected period.</p>
+                        )}
+                    </div>
                 </div>
-                <div className="text-right">
-                    <p className="font-bold text-gray-900 dark:text-white text-lg">Kshs {purchase.totalCost.toLocaleString()}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{purchase.quantity} units @ {purchase.cost.toLocaleString()}</p>
-                </div>
-              </div>
-              <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 flex justify-between items-center">
-                 <p className="text-xs text-gray-500 dark:text-gray-400">{formatStandardDate(purchase.date)}</p>
-                 <div className="space-x-2">
-                    <button onClick={() => openPurchaseModal(purchase)} className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm">Edit</button>
-                    <button onClick={() => {if (window.confirm('Delete this purchase record?')) onDeletePurchase(purchase.id)}} className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 text-sm">Delete</button>
-                 </div>
-              </div>
-            </div>
-          </div>
-        )) : (
-           <div className="text-center py-16">
-            <p className="text-gray-500 dark:text-gray-400">No purchase records found for the selected filter.</p>
-          </div>
-        )}
+            )
+        })}
       </div>
     </div>
   );

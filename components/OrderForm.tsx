@@ -86,10 +86,10 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
     }
 
     if (isItemBased) {
-        if ((currentSale.unitPrice ?? 0) <= 0) newErrors.unitPrice = 'Unit price must be greater than zero.';
+        if ((currentSale.unitPrice ?? 0) < 0) newErrors.unitPrice = 'Unit price cannot be negative.';
         if ((currentSale.quantity ?? 0) < 1) newErrors.quantity = 'Quantity must be at least 1.';
     } else {
-        if ((currentSale.price ?? 0) <= 0) newErrors.price = 'Price must be greater than zero.';
+        if ((currentSale.price ?? 0) < 0) newErrors.price = 'Price cannot be negative.';
     }
 
     if(currentSale.paymentMethod === PaymentMethod.Credit && !currentSale.customerIdNumber) {
@@ -391,7 +391,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
            <>
              <div>
                 <label htmlFor="unitPrice" className={labelClasses}>Unit Price (Kshs)</label>
-                <input type="number" id="unitPrice" name="unitPrice" value={sale.unitPrice} onChange={handleChange} onFocus={(e) => e.target.select()} className={getInputClasses('unitPrice')} />
+                <input type="number" id="unitPrice" name="unitPrice" value={sale.unitPrice} onChange={handleChange} onFocus={(e) => e.target.select()} className={getInputClasses('unitPrice')} min="0" />
                 {errors.unitPrice && <p className="text-sm text-red-500 mt-1">{errors.unitPrice}</p>}
              </div>
              <div>
@@ -403,7 +403,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
         ) : (
              <div>
                 <label htmlFor="price" className={labelClasses}>Price (Kshs)</label>
-                <input type="number" id="price" name="price" value={sale.price} onChange={handleChange} onFocus={(e) => e.target.select()} className={getInputClasses('price')} />
+                <input type="number" id="price" name="price" value={sale.price} onChange={handleChange} onFocus={(e) => e.target.select()} className={getInputClasses('price')} min="0" />
                 {errors.price && <p className="text-sm text-red-500 mt-1">{errors.price}</p>}
              </div>
         )}
