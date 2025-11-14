@@ -12,7 +12,8 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "qrcode.react": "^4.2.0",
-    "react-qr-scanner": "^1.0.0-alpha.11"
+    "react-qr-scanner": "^1.0.0-alpha.11",
+    "xlsx": "latest"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

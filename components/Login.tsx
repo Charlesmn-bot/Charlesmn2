@@ -1,33 +1,21 @@
-
 import React, { useState } from 'react';
 import { STORE_NAME } from '../constants';
 import { EyeIcon } from './icons/EyeIcon';
 import { EyeOffIcon } from './icons/EyeOffIcon';
-import { User } from '../types';
-
-const USERS = [
-  { id: 'user-1', username: 'Admin', password: 'Admin123', role: 'Admin' as 'Admin' | 'Cashier' },
-  { id: 'user-2', username: 'Cashier', password: 'Cashier123', role: 'Cashier' as 'Admin' | 'Cashier' },
-];
 
 interface LoginProps {
-  onLoginSuccess: (user: User) => void;
+  onLogin: (username: string, password; string) => void;
+  loginError: string | null;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
+export const Login: React.FC<LoginProps> = ({ onLogin, loginError }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const user = USERS.find(u => u.username === username && u.password === password);
-    if (user) {
-      onLoginSuccess({ id: user.id, username: user.username, role: user.role });
-    } else {
-      setError('Invalid username or password.');
-    }
+    onLogin(username, password);
   };
   
   const inputClasses = "w-full bg-brand-surface dark:bg-[#374151] border border-gray-300 dark:border-gray-600 rounded-md p-3 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition";
@@ -71,7 +59,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               </button>
             </div>
           </div>
-          {error && <p className="text-sm text-red-500 dark:text-red-400">{error}</p>}
+          {loginError && <p className="text-sm text-red-500 dark:text-red-400 text-center">{loginError}</p>}
           <div>
             <button type="submit" className="w-full px-4 py-3 font-bold text-white bg-brand-primary rounded-md hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-brand-header dark:focus:ring-offset-[#111827] focus:ring-brand-primary">
               Log In

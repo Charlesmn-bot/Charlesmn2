@@ -8,6 +8,7 @@ interface ReceiptProps {
   sale: Sale;
   onClose: () => void;
   onEdit: (sale: Sale) => void;
+  onDelete: (saleId: string) => void;
   technicians: Technician[];
   currentUser: User | null;
   allSales: Sale[];
@@ -62,7 +63,7 @@ const AddPaymentModal: React.FC<{ sale: Sale; onSave: (amount: number) => void; 
     )
 }
 
-export const Receipt: React.FC<ReceiptProps> = ({ sale, onClose, onEdit, technicians, currentUser, allSales, onUpdateCreditPayment }) => {
+export const Receipt: React.FC<ReceiptProps> = ({ sale, onClose, onEdit, onDelete, technicians, currentUser, allSales, onUpdateCreditPayment }) => {
   const cashierName = currentUser?.username || 'N/A';
   const isCreditSale = sale.paymentMethod === PaymentMethod.Credit;
   const [isPaymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -98,12 +99,13 @@ export const Receipt: React.FC<ReceiptProps> = ({ sale, onClose, onEdit, technic
 
   const getReceiptText = () => {
     let text = `*${STORE_NAME}*\n\n` +
-           `*Receipt #: ${sale.receiptNumber}*\n` +
+           `*${sale.saleType === SaleType.Return ? 'Return ' : ''}Receipt #: ${sale.receiptNumber}*\n` +
            `--------------------------\n` +
            `Customer: ${sale.customerName}\n`;
     if (sale.customerNumber) text += `Phone: ${sale.customerNumber}\n`;
     
-    text += `Item: ${sale.phoneType}\n` +
+    const itemText = sale.quantity && sale.quantity > 1 ? `${sale.phoneType} (x${sale.quantity})` : sale.phoneType;
+    text += `Item: ${itemText}\n` +
             `Sale Type: ${sale.saleType}\n`;
 
     if (sale.saleType === SaleType.Repair) {
@@ -113,8 +115,15 @@ export const Receipt: React.FC<ReceiptProps> = ({ sale, onClose, onEdit, technic
     }
     
     text += `Date Booked: ${formatStandardDate(sale.dateBooked)}\n` +
-           `--------------------------\n` +
-           `*Total: Kshs ${sale.price.toLocaleString()}*\n` +
+           `--------------------------\n`;
+
+    if (sale.discount && sale.discount > 0) {
+        const subtotal = sale.price + sale.discount;
+        text += `Subtotal: Kshs ${subtotal.toLocaleString()}\n`;
+        text += `Discount: -Kshs ${sale.discount.toLocaleString()}\n`;
+    }
+           
+    text += `*Total: Kshs ${sale.price.toLocaleString()}*\n` +
            `Payment Method: ${sale.paymentMethod}\n`;
 
     if(isCreditSale) {
@@ -151,6 +160,14 @@ export const Receipt: React.FC<ReceiptProps> = ({ sale, onClose, onEdit, technic
         window.open(`https://wa.me/${storePhone}?text=${text}`, '_blank');
     }, 500);
   };
+
+  const handleDelete = () => {
+    if (window.confirm('Are you sure you want to delete this sale record? This action cannot be undone.')) {
+      onDelete(sale.id);
+    }
+  }
+
+  const subtotal = sale.discount ? sale.price + sale.discount : sale.price;
   
   return (
     <>
@@ -166,7 +183,7 @@ export const Receipt: React.FC<ReceiptProps> = ({ sale, onClose, onEdit, technic
           <div className="my-6 border-t-2 border-dashed border-gray-300 dark:border-gray-500 print:border-gray-400"></div>
 
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between"><span className="font-semibold">Receipt #:</span><span>{sale.receiptNumber}</span></div>
+            <div className="flex justify-between"><span className="font-semibold">{sale.saleType === SaleType.Return ? 'Return Receipt #:' : 'Receipt #:'}</span><span>{sale.receiptNumber}</span></div>
             <div className="flex justify-between"><span className="font-semibold">Cashier:</span><span>{cashierName}</span></div>
             <div className="flex justify-between">
                 <span className="font-semibold">Date:</span>
@@ -191,7 +208,10 @@ export const Receipt: React.FC<ReceiptProps> = ({ sale, onClose, onEdit, technic
 
           <div className="space-y-2 text-sm">
             <p className="font-bold">Sale Details:</p>
-            <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400 print:text-gray-700">{sale.saleType === SaleType.Accessory ? 'Accessory' : 'Item'}:</span><span className="text-right">{sale.phoneType}</span></div>
+            <div className="flex justify-between">
+              <span className="text-gray-500 dark:text-gray-400 print:text-gray-700">{sale.saleType === SaleType.Accessory ? 'Accessory' : 'Item'}:</span>
+              <span className="text-right">{sale.phoneType} {sale.quantity && sale.quantity > 1 ? `(x${sale.quantity})` : ''}</span>
+            </div>
             <div className="flex justify-between"><span className="font-semibold print:text-gray-700">Sale Type:</span><span className="text-right">{sale.saleType}</span></div>
             {sale.saleType === SaleType.Repair && sale.repairType && <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400 print:text-gray-700">Repair:</span><span className="text-right">{sale.repairType}</span></div>}
             {sale.saleType === SaleType.Repair && <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400 print:text-gray-700">Technician:</span><span className="text-right">{getTechnicianName(sale.assignedTechnician)}</span></div>}
@@ -201,7 +221,17 @@ export const Receipt: React.FC<ReceiptProps> = ({ sale, onClose, onEdit, technic
           <div className="my-6 border-t border-dashed border-gray-300 dark:border-gray-500 print:border-gray-400"></div>
           
           <div className="space-y-2 text-sm">
-             <div className="flex justify-between text-xl font-bold"><span className="">Total:</span><span>Kshs {sale.price.toLocaleString()}</span></div>
+             {(sale.discount || 0) > 0 && (
+                <>
+                    {sale.quantity && sale.quantity > 1 && sale.unitPrice && (
+                         <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400 print:text-gray-700">Calculation:</span><span>{sale.quantity} x {sale.unitPrice.toLocaleString()}</span></div>
+                    )}
+                    <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400 print:text-gray-700">Subtotal:</span><span>Kshs {subtotal.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400 print:text-gray-700">Discount:</span><span className="text-red-500">- Kshs {sale.discount?.toLocaleString()}</span></div>
+                </>
+             )}
+
+             <div className="flex justify-between text-xl font-bold"><span className="">{sale.saleType === SaleType.Return ? 'Amount Refunded:' : 'Total:'}</span><span>Kshs {sale.price.toLocaleString()}</span></div>
              <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400 print:text-gray-700">Payment:</span><span>{sale.paymentMethod}</span></div>
              {isCreditSale && (
                 !sale.creditPaid ? (
@@ -243,7 +273,10 @@ export const Receipt: React.FC<ReceiptProps> = ({ sale, onClose, onEdit, technic
               <button onClick={() => setPaymentModalOpen(true)} className="w-full bg-green-600 text-white py-3 rounded-md font-bold hover:bg-green-700 transition">Manage Payment</button>
             )}
             {currentUser?.role === 'Admin' && (
-              <button onClick={() => onEdit(sale)} className="w-full bg-brand-secondary text-white py-3 rounded-md font-bold hover:bg-orange-600 transition">Edit Sale</button>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => onEdit(sale)} className="w-full bg-brand-secondary text-white py-3 rounded-md font-bold hover:bg-orange-600 transition">Edit Sale</button>
+                <button onClick={handleDelete} className="w-full bg-red-600 text-white py-3 rounded-md font-bold hover:bg-red-700 transition">Delete Sale</button>
+              </div>
             )}
             <button onClick={handlePrint} className="w-full bg-brand-primary text-white py-3 rounded-md font-bold hover:bg-blue-700 transition">Print Receipt</button>
             <button onClick={handleWhatsAppShare} className="w-full bg-green-500 text-white py-3 rounded-md font-bold hover:bg-green-600 transition">Share on WhatsApp</button>

@@ -18,7 +18,6 @@ type BreakdownView = 'daily' | 'monthly' | 'quarterly' | 'yearly';
 
 const LineChart: React.FC<{ data: { [key: string]: number } }> = ({ data }) => {
     const labels = Object.keys(data);
-    // FIX: Cast Object.values to number[] to resolve type errors with Math.max and array mapping. This fixes errors on lines 32, 40, and 85.
     const values = Object.values(data) as number[];
     
     if (values.length < 2) {
@@ -31,8 +30,8 @@ const LineChart: React.FC<{ data: { [key: string]: number } }> = ({ data }) => {
     const boundedWidth = width - margin.left - margin.right;
     const boundedHeight = height - margin.top - margin.bottom;
 
-    const maxValue = Math.max(...values);
-    const yAxisMax = Math.ceil(maxValue / 1000) * 1000;
+    const maxValue = values.length > 0 ? Math.max(...values) : 0;
+    const yAxisMax = Math.ceil(maxValue / 1000) * 1000 || 1000;
 
     const xScale = (index: number) => margin.left + (index / (values.length - 1)) * boundedWidth;
     const yScale = (value: number) => margin.top + boundedHeight - (value / yAxisMax) * boundedHeight;
@@ -255,7 +254,6 @@ export const TotalSales: React.FC<{ sales: Sale[] }> = ({ sales }) => {
                         {Object.entries(breakdownData).map(([period, amount]) => (
                             <tr key={period} className="border-b border-gray-200 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                 <td className="p-2 font-medium text-gray-900 dark:text-white">{period}</td>
-                                {/* FIX: Cast amount to number as Object.entries may infer its type as unknown. */}
                                 <td className="p-2 font-mono text-gray-800 dark:text-gray-200 text-right">{new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount as number)}</td>
                             </tr>
                         ))}

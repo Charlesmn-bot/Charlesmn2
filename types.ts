@@ -1,4 +1,3 @@
-
 export enum Status {
   Pending = 'Pending',
   InProgress = 'In Progress',
@@ -11,6 +10,7 @@ export enum SaleType {
   Repair = 'Repair',
   PhoneSale = 'Phone Sale',
   B2B_FundiShopSale = 'B2B/Fundi Shop Sale',
+  Return = 'Return',
 }
 
 export enum PaymentMethod {
@@ -34,6 +34,8 @@ export interface CustomerServiceRepresentative {
 export interface User {
   id: string;
   username: string;
+  // FIX: Corrected typo from 'password; string;' to 'password: string;'.
+  password: string;
   role: 'Admin' | 'Cashier';
 }
 
@@ -45,7 +47,10 @@ export interface Sale {
   phoneType: string; // Will be 'Accessory Name' for accessories
   saleType: SaleType;
   repairType?: string; // Only for Repair
-  price: number;
+  price: number; // This is the FINAL price after discounts
+  unitPrice?: number; // Price per item, for quantity-based sales
+  quantity?: number; // Number of items, for quantity-based sales
+  discount?: number; // Discount amount in Kshs
   assignedTechnician?: Technician['id']; // Not for Accessory
   estimatedRepairTime?: string; // Only for Repair
   storageLocation?: string; // Only for Repair/PhoneSale
@@ -75,6 +80,7 @@ export interface Sale {
 export interface Supplier {
   id: string;
   name: string;
+  // FIX: Added 'contact' property to match its usage in the application.
   contact: string;
 }
 
