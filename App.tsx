@@ -172,7 +172,7 @@ const App: React.FC = () => {
       return <Receipt sale={selectedSale} onClose={resetView} onEdit={handleEditSale} technicians={technicians} currentUser={currentUser} />;
     }
     if (currentView === 'form' && (saleTypeToCreate || selectedSale)) {
-      return <SaleForm saleType={selectedSale?.saleType || saleTypeToCreate!} saleToEdit={selectedSale} onSave={handleSaveSale} onCancel={resetView} getNewReceiptNumber={getNewReceiptNumber} technicians={technicians}/>;
+      return <SaleForm saleType={selectedSale?.saleType || saleTypeToCreate!} saleToEdit={selectedSale} onSave={handleSaveSale} onCancel={resetView} getNewReceiptNumber={getNewReceiptNumber} technicians={technicians} purchases={purchases}/>;
     }
     if (currentView === 'scanner') {
         return <Scanner onScan={handleScan} onClose={resetView} />;

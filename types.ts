@@ -10,6 +10,7 @@ export enum SaleType {
   Accessory = 'Accessory',
   Repair = 'Repair',
   PhoneSale = 'Phone Sale',
+  FundiShopSale = 'Fundi Shop Sale',
 }
 
 export enum PaymentMethod {
@@ -17,6 +18,7 @@ export enum PaymentMethod {
   Mpesa = 'M-Pesa',
   LipaMdogoMdogo = 'Lipa Mdogo Mdogo',
   Onfone = 'Onfone',
+  Credit = 'Credit',
 }
 
 export interface Technician {

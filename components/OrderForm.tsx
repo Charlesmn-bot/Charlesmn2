@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Sale, SaleType, PaymentMethod, Status, Technician } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Sale, SaleType, PaymentMethod, Status, Technician, Purchase } from '../types';
 import { ACCESSORY_PRODUCTS, REPAIR_TYPES, PHONE_MODELS_BY_BRAND } from '../constants';
 
 const REPAIR_TIME_OPTIONS = ['30 Min', '45 Min', '1 hr', '2 hrs', '1 day', '2 days', '3 days'];
@@ -13,9 +13,10 @@ interface SaleFormProps {
   getNewReceiptNumber: () => string;
   technicians: Technician[];
   saleType: SaleType;
+  purchases: Purchase[];
 }
 
-export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCancel, getNewReceiptNumber, technicians, saleType }) => {
+export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCancel, getNewReceiptNumber, technicians, saleType, purchases }) => {
   const [sale, setSale] = useState<Partial<Sale>>({
     customerName: '',
     customerNumber: '',
@@ -37,22 +38,29 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
   const [devicePhotoPreview, setDevicePhotoPreview] = useState<string | undefined>(undefined);
   const [fileErrors, setFileErrors] = useState<{ imeiPhoto?: string; devicePhoto?: string }>({});
   const [availableModels, setAvailableModels] = useState<string[]>([]);
-  const [otherAccessory, setOtherAccessory] = useState('');
+  const [otherItemName, setOtherItemName] = useState('');
   const [otherRepair, setOtherRepair] = useState('');
+
+  const sparePartsList = useMemo(() => {
+    const parts = new Set<string>();
+    purchases.forEach(p => parts.add(p.product));
+    return Array.from(parts).sort();
+  }, [purchases]);
 
   useEffect(() => {
     if (saleToEdit) {
       const saleData = { ...saleToEdit };
       
-      // Check for 'Other' Accessory
       if (saleToEdit.saleType === SaleType.Accessory && !ACCESSORY_PRODUCTS.includes(saleToEdit.phoneType)) {
         saleData.phoneType = 'Other';
-        setOtherAccessory(saleToEdit.phoneType);
+        setOtherItemName(saleToEdit.phoneType);
+      } else if (saleToEdit.saleType === SaleType.FundiShopSale && !sparePartsList.includes(saleToEdit.phoneType)) {
+        saleData.phoneType = 'Other';
+        setOtherItemName(saleToEdit.phoneType);
       } else {
-        setOtherAccessory('');
+        setOtherItemName('');
       }
 
-      // Check for 'Other' Repair
       if (saleToEdit.saleType === SaleType.Repair && saleToEdit.repairType && !REPAIR_TYPES.includes(saleToEdit.repairType)) {
         saleData.repairType = 'Other';
         setOtherRepair(saleToEdit.repairType);
@@ -64,7 +72,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
       setImeiPhotoPreview(saleToEdit.imeiPhoto);
       setDevicePhotoPreview(saleToEdit.devicePhoto);
     }
-  }, [saleToEdit]);
+  }, [saleToEdit, sparePartsList]);
 
   useEffect(() => {
     const isPhoneSale = sale.saleType === SaleType.Repair || sale.saleType === SaleType.PhoneSale;
@@ -83,7 +91,6 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
                 setSale(prev => ({ ...prev, storageLocation: selectedTechnician.name }));
             }
         } else {
-            // Clear storage location if technician is unselected
             setSale(prev => ({ ...prev, storageLocation: '' }));
         }
     }
@@ -91,7 +98,6 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
 
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'imeiPhoto' | 'devicePhoto') => {
-    // Clear previous error and data for this field
     setFileErrors(prev => ({ ...prev, [field]: undefined }));
     setSale(prev => ({ ...prev, [field]: undefined }));
     if (field === 'imeiPhoto') setImeiPhotoPreview(undefined);
@@ -100,20 +106,18 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
     const file = e.target.files?.[0];
 
     if (!file) {
-      return; // No file selected, do nothing.
-    }
-
-    // Validate file type
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      setFileErrors(prev => ({ ...prev, [field]: 'Invalid file type. Please upload an image (JPEG, PNG, GIF, WebP).' }));
-      e.target.value = ''; // Reset the input field
       return;
     }
 
-    // Validate file size
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      setFileErrors(prev => ({ ...prev, [field]: 'Invalid file type. Please upload an image (JPEG, PNG, GIF, WebP).' }));
+      e.target.value = '';
+      return;
+    }
+
     if (file.size > MAX_FILE_SIZE_BYTES) {
       setFileErrors(prev => ({ ...prev, [field]: `File is too large. Maximum size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB.` }));
-      e.target.value = ''; // Reset the input field
+      e.target.value = '';
       return;
     }
 
@@ -126,19 +130,18 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
     };
     reader.onerror = () => {
       setFileErrors(prev => ({ ...prev, [field]: 'Failed to read the file. Please try again.' }));
-      e.target.value = ''; // Reset the input field
+      e.target.value = '';
     };
     reader.readAsDataURL(file);
   };
 
   const handleSaleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newType = e.target.value as SaleType;
-    setOtherAccessory('');
+    setOtherItemName('');
     setOtherRepair('');
     setSale(prev => {
         const newState: Partial<Sale> = { ...prev, saleType: newType, phoneType: '', phoneModel: '' };
-        // Reset fields when switching type to prevent carrying over irrelevant data
-        if (newType === SaleType.Accessory) {
+        if (newType === SaleType.Accessory || newType === SaleType.FundiShopSale) {
             delete newState.repairType;
             delete newState.assignedTechnician;
             delete newState.estimatedRepairTime;
@@ -160,7 +163,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
             newState.status = Status.Completed;
         }
 
-        if (newType === SaleType.Accessory || newType === SaleType.Repair) {
+        if (newType === SaleType.Accessory || newType === SaleType.Repair || newType === SaleType.FundiShopSale) {
             newState.paymentMethod = PaymentMethod.Cash;
             delete newState.lipaMdogoMdogoPlan;
             delete newState.lipaMdogoMdogoAmount;
@@ -175,7 +178,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
     const { name, value, type } = e.target;
     
     if (name === 'phoneType' && value !== 'Other') {
-        setOtherAccessory('');
+        setOtherItemName('');
     }
     if (name === 'repairType' && value !== 'Other') {
         setOtherRepair('');
@@ -190,7 +193,6 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
     setSale(prev => {
         const newState: Partial<Sale> = { ...prev, [name]: finalValue };
 
-        // If payment method changes, clear related fields
         if (name === 'paymentMethod') {
             if (value !== PaymentMethod.Mpesa) delete newState.mpesaNumber;
             if (value !== PaymentMethod.LipaMdogoMdogo) {
@@ -200,7 +202,6 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
             if (value !== PaymentMethod.Onfone) delete newState.onfoneTransactionId;
         }
 
-        // if phone brand changes, clear model
         if (name === 'phoneType' && prev.phoneType !== value) {
             newState.phoneModel = '';
         }
@@ -212,8 +213,8 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (sale.saleType === SaleType.Accessory && sale.phoneType === 'Other' && !otherAccessory.trim()) {
-      alert('Please specify the accessory product name in the "Other" field.');
+    if ((sale.saleType === SaleType.Accessory || sale.saleType === SaleType.FundiShopSale) && sale.phoneType === 'Other' && !otherItemName.trim()) {
+      alert('Please specify the product name in the "Other" field.');
       return;
     }
 
@@ -222,11 +223,11 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
       return;
     }
 
-    if (sale.customerName && (sale.phoneType || otherAccessory) && (sale.price || 0) >= 0 && sale.saleType) {
+    if (sale.customerName && (sale.phoneType || otherItemName) && (sale.price || 0) >= 0 && sale.saleType) {
        const saleDataForSave = { ...sale };
 
-      if (sale.saleType === SaleType.Accessory && sale.phoneType === 'Other') {
-        saleDataForSave.phoneType = otherAccessory.trim();
+      if ((sale.saleType === SaleType.Accessory || sale.saleType === SaleType.FundiShopSale) && sale.phoneType === 'Other') {
+        saleDataForSave.phoneType = otherItemName.trim();
       }
       if (sale.saleType === SaleType.Repair && sale.repairType === 'Other') {
         saleDataForSave.repairType = otherRepair.trim();
@@ -259,14 +260,25 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
   const getTitle = () => {
       if(saleToEdit) return `Edit ${sale.saleType} Sale`;
       if (sale.saleType === SaleType.PhoneSale) return 'New Phone Sale';
+      if (sale.saleType === SaleType.FundiShopSale) return 'New Fundi Shop Sale';
       return `New ${sale.saleType} Sale`;
   }
   
   const isPhoneBasedSale = sale.saleType === SaleType.Repair || sale.saleType === SaleType.PhoneSale;
 
-  const paymentOptions = (sale.saleType === SaleType.Accessory || sale.saleType === SaleType.Repair)
-    ? [PaymentMethod.Cash, PaymentMethod.Mpesa]
-    : Object.values(PaymentMethod);
+  const paymentOptions = useMemo(() => {
+    switch (sale.saleType) {
+      case SaleType.FundiShopSale:
+        return [PaymentMethod.Cash, PaymentMethod.Mpesa, PaymentMethod.Credit];
+      case SaleType.Accessory:
+      case SaleType.Repair:
+        return [PaymentMethod.Cash, PaymentMethod.Mpesa];
+      case SaleType.PhoneSale:
+        return [PaymentMethod.Cash, PaymentMethod.Mpesa, PaymentMethod.LipaMdogoMdogo, PaymentMethod.Onfone];
+      default:
+        return [PaymentMethod.Cash, PaymentMethod.Mpesa];
+    }
+  }, [sale.saleType]);
 
   return (
     <form onSubmit={handleSubmit} className="p-3 space-y-3 max-w-2xl mx-auto">
@@ -313,9 +325,11 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
         </div>
       )}
 
-      {sale.saleType === SaleType.Accessory && (
+      {(sale.saleType === SaleType.Accessory || sale.saleType === SaleType.FundiShopSale) && (
         <div>
-            <label htmlFor="phoneType" className={labelClasses}>Accessory Product</label>
+            <label htmlFor="phoneType" className={labelClasses}>
+                {sale.saleType === SaleType.Accessory ? 'Accessory Product' : 'Repair Spare'}
+            </label>
             <select
               id="phoneType"
               name="phoneType"
@@ -324,19 +338,21 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
               className={inputClasses}
               required
             >
-              <option value="">Select an Accessory</option>
-              {ACCESSORY_PRODUCTS.map(p => <option key={p} value={p}>{p}</option>)}
+              <option value="">
+                {sale.saleType === SaleType.Accessory ? 'Select an Accessory' : 'Select a Spare Part'}
+              </option>
+              {(sale.saleType === SaleType.Accessory ? ACCESSORY_PRODUCTS : sparePartsList).map(p => <option key={p} value={p}>{p}</option>)}
               <option value="Other">Other</option>
             </select>
             {sale.phoneType === 'Other' && (
                  <input
                     type="text"
-                    id="otherAccessory"
-                    name="otherAccessory"
-                    value={otherAccessory}
-                    onChange={(e) => setOtherAccessory(e.target.value)}
+                    id="otherItemName"
+                    name="otherItemName"
+                    value={otherItemName}
+                    onChange={(e) => setOtherItemName(e.target.value)}
                     className={`${inputClasses} mt-2`}
-                    placeholder="Enter custom product name"
+                    placeholder={sale.saleType === SaleType.Accessory ? 'Enter custom product name' : 'Enter custom spare part name'}
                     required
                 />
             )}
