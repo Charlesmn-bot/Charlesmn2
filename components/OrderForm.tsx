@@ -472,7 +472,7 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                   <div>
                       <label htmlFor="customerIdNumber" className={labelClasses}>Customer ID Number</label>
-                      <input type="text" id="customerIdNumber" name="customerIdNumber" value={sale.customerIdNumber || ''} onChange={handleChange} className={inputClasses} />
+                      <input type="text" id="customerIdNumber" name="customerIdNumber" value={sale.customerIdNumber || ''} onChange={handleChange} className={inputClasses} required />
                   </div>
                   <div>
                       <label htmlFor="creditDueDate" className={labelClasses}>Due Date</label>

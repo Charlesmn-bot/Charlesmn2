@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Sale, PaymentMethod } from '../types';
 import { CashIcon } from './icons/CashIcon';
@@ -97,6 +96,7 @@ const DebtCard: React.FC<{ debt: Sale; onAddPayment: () => void; onViewDetails: 
 export const DebtRegister: React.FC<DebtRegisterProps> = ({ sales, onUpdatePayment, onViewSale }) => {
   const [selectedDebt, setSelectedDebt] = useState<Sale | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [overdueNotification, setOverdueNotification] = useState<string | null>(null);
   
   const debts = useMemo(() => {
     return sales
@@ -126,8 +126,8 @@ export const DebtRegister: React.FC<DebtRegisterProps> = ({ sales, onUpdatePayme
     if (overdueDebts.length > 0) {
         const alerted = sessionStorage.getItem('overdue_alerted');
         if (!alerted) {
-            const names = overdueDebts.map(d => `${d.customerName} (${d.customerNumber || 'N/A'})`).join(', ');
-            alert(`Payment Reminder: The following customers have overdue payments: ${names}. Please follow up.`);
+            const names = overdueDebts.map(d => d.customerName).join(', ');
+            setOverdueNotification(`The following customers have overdue payments: ${names}. Please follow up.`);
             sessionStorage.setItem('overdue_alerted', 'true');
         }
     }
@@ -145,6 +145,24 @@ export const DebtRegister: React.FC<DebtRegisterProps> = ({ sales, onUpdatePayme
   return (
     <div className="p-3 pb-24">
       {selectedDebt && <AddPaymentModal sale={selectedDebt} onClose={() => setSelectedDebt(null)} onSave={(amount) => handleAddPayment(selectedDebt.id, amount)} />}
+
+      {overdueNotification && (
+        <div className="bg-yellow-100 dark:bg-yellow-900/30 border-l-4 border-yellow-500 text-yellow-800 dark:text-yellow-200 p-4 mb-4 rounded-md shadow-lg flex justify-between items-start" role="alert">
+            <div>
+                <p className="font-bold">Overdue Payment Reminder</p>
+                <p className="text-sm mt-1">{overdueNotification}</p>
+            </div>
+            <button 
+                onClick={() => setOverdueNotification(null)} 
+                className="p-1 rounded-md hover:bg-yellow-200 dark:hover:bg-yellow-800/50 transition-colors"
+                aria-label="Dismiss"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+      )}
 
       <div className="flex items-center mb-4">
         <CashIcon className="h-8 w-8 text-brand-primary mr-3" />
