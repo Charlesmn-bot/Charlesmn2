@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Sale, Status, SaleType } from '../types';
 import { SaleCard } from './OrderCard';
@@ -20,12 +21,55 @@ export const Dashboard: React.FC<SalesDashboardProps> = ({ sales, onViewSale, on
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [activeRange, setActiveRange] = useState<string | null>(null);
   
   const handleTypeFilterChange = (filter: SaleType | 'All') => {
     setActiveTypeFilter(filter);
     if (filter !== SaleType.Repair) {
         setActiveStatusFilter('All');
     }
+  };
+
+  const setDateRange = (range: string) => {
+    const today = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    switch (range) {
+        case 'today':
+            break;
+        case 'thisweek':
+            const currentDay = new Date(today);
+            const firstDayOfWeek = new Date(currentDay.setDate(currentDay.getDate() - currentDay.getDay()));
+            start = firstDayOfWeek;
+            end = new Date(start);
+            end.setDate(end.getDate() + 6);
+            break;
+        case 'thismonth':
+            start = new Date(today.getFullYear(), today.getMonth(), 1);
+            end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            break;
+        case 'thisyear':
+            start = new Date(today.getFullYear(), 0, 1);
+            end = new Date(today.getFullYear(), 11, 31);
+            break;
+        default: return;
+    }
+
+    const formatDate = (date: Date) => date.toISOString().split('T')[0];
+    setStartDate(formatDate(start));
+    setEndDate(formatDate(end));
+    setActiveRange(range);
+  };
+
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStartDate(e.target.value);
+    setActiveRange(null);
+  };
+
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEndDate(e.target.value);
+    setActiveRange(null);
   };
 
   const filteredSales = useMemo(() => {
@@ -79,6 +123,24 @@ export const Dashboard: React.FC<SalesDashboardProps> = ({ sales, onViewSale, on
                 <QrcodeIcon className="h-6 w-6" />
             </button>
         </div>
+        <div className="flex flex-wrap gap-2 mb-2">
+            {['Today', 'This Week', 'This Month', 'This Year'].map(range => {
+                const rangeKey = range.toLowerCase().replace(' ', '');
+                return (
+                    <button
+                        key={rangeKey}
+                        onClick={() => setDateRange(rangeKey)}
+                        className={`px-3 py-1 text-sm font-medium rounded-full whitespace-nowrap transition ${
+                            activeRange === rangeKey
+                                ? 'bg-brand-secondary text-white'
+                                : 'bg-brand-surface dark:bg-[#374151] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600'
+                        }`}
+                    >
+                        {range}
+                    </button>
+                )
+            })}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
                 <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
@@ -86,7 +148,7 @@ export const Dashboard: React.FC<SalesDashboardProps> = ({ sales, onViewSale, on
                     type="date"
                     id="startDate"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={handleStartDateChange}
                     className="w-full bg-brand-surface dark:bg-[#374151] border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white"
                 />
                 {startDate && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDisplayDate(startDate)}</p>}
@@ -97,7 +159,7 @@ export const Dashboard: React.FC<SalesDashboardProps> = ({ sales, onViewSale, on
                     type="date"
                     id="endDate"
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    onChange={handleEndDateChange}
                     className="w-full bg-brand-surface dark:bg-[#374151] border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white"
                 />
                 {endDate && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDisplayDate(endDate)}</p>}

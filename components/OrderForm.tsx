@@ -91,6 +91,16 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
     } else {
         if ((currentSale.price ?? 0) < 0) newErrors.price = 'Price cannot be negative.';
     }
+    
+    const subTotal = isItemBased
+      ? (currentSale.unitPrice || 0) * (currentSale.quantity || 1)
+      : (currentSale.price || 0);
+
+    if ((currentSale.discount || 0) < 0) {
+      newErrors.discount = 'Discount cannot be negative.';
+    } else if ((currentSale.discount || 0) > subTotal) {
+      newErrors.discount = 'Discount cannot exceed total price.';
+    }
 
     if(currentSale.paymentMethod === PaymentMethod.Credit && !currentSale.customerIdNumber) {
         newErrors.customerIdNumber = 'Customer ID number is required for credit sales.';
@@ -423,7 +433,8 @@ export const OrderForm: React.FC<SaleFormProps> = ({ saleToEdit, onSave, onCance
             <div className="grid grid-cols-2 gap-3">
                 <div>
                     <label htmlFor="discount" className={labelClasses}>Discount (Kshs)</label>
-                    <input type="number" id="discount" name="discount" value={sale.discount || ''} onChange={handleChange} onFocus={(e) => e.target.select()} className={getInputClasses('discount')} />
+                    <input type="number" id="discount" name="discount" value={sale.discount || ''} onChange={handleChange} onFocus={(e) => e.target.select()} className={getInputClasses('discount')} min="0" />
+                    {errors.discount && <p className="text-sm text-red-500 mt-1">{errors.discount}</p>}
                 </div>
                 <div>
                     <label className={labelClasses}>Total Price</label>

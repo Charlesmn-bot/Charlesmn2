@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import { Sale } from '../types';
 import { ChartBarIcon } from './icons/ChartBarIcon';
@@ -95,6 +96,47 @@ export const TotalSales: React.FC<{ sales: Sale[] }> = ({ sales }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [breakdownView, setBreakdownView] = useState<BreakdownView>('daily');
+  const [activeRange, setActiveRange] = useState<string | null>(null);
+
+  const setDateRange = (range: string) => {
+    const today = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    switch (range) {
+        case 'today':
+            break;
+        case 'thisweek':
+            const currentDay = new Date(today);
+            const firstDayOfWeek = new Date(currentDay.setDate(currentDay.getDate() - currentDay.getDay()));
+            start = firstDayOfWeek;
+            end = new Date(start);
+            end.setDate(end.getDate() + 6);
+            break;
+        case 'thismonth':
+            start = new Date(today.getFullYear(), today.getMonth(), 1);
+            end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            break;
+        case 'thisyear':
+            start = new Date(today.getFullYear(), 0, 1);
+            end = new Date(today.getFullYear(), 11, 31);
+            break;
+        default: return;
+    }
+    const formatDate = (date: Date) => date.toISOString().split('T')[0];
+    setStartDate(formatDate(start));
+    setEndDate(formatDate(end));
+    setActiveRange(range);
+  };
+
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStartDate(e.target.value);
+    setActiveRange(null);
+  };
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEndDate(e.target.value);
+    setActiveRange(null);
+  };
 
   const filteredSales = useMemo(() => {
     return sales.filter(sale => {
@@ -179,6 +221,24 @@ export const TotalSales: React.FC<{ sales: Sale[] }> = ({ sales }) => {
       
        <div className="mb-6 bg-brand-surface dark:bg-[#374151] p-4 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-3">Filter by Date</h2>
+            <div className="flex flex-wrap gap-2 mb-3">
+                {['Today', 'This Week', 'This Month', 'This Year'].map(range => {
+                    const rangeKey = range.toLowerCase().replace(' ', '');
+                    return (
+                        <button
+                            key={rangeKey}
+                            onClick={() => setDateRange(rangeKey)}
+                            className={`px-3 py-1 text-sm font-medium rounded-full whitespace-nowrap transition ${
+                                activeRange === rangeKey
+                                    ? 'bg-brand-secondary text-white'
+                                    : 'bg-brand-header dark:bg-[#1F2937] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-600'
+                            }`}
+                        >
+                            {range}
+                        </button>
+                    )
+                })}
+            </div>
           <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                   <label htmlFor="totalSalesStartDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
@@ -186,7 +246,7 @@ export const TotalSales: React.FC<{ sales: Sale[] }> = ({ sales }) => {
                       type="date"
                       id="totalSalesStartDate"
                       value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
+                      onChange={handleStartDateChange}
                       className="w-full bg-brand-header dark:bg-[#1F2937] border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white"
                   />
                   {startDate && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDisplayDate(startDate)}</p>}
@@ -197,7 +257,7 @@ export const TotalSales: React.FC<{ sales: Sale[] }> = ({ sales }) => {
                       type="date"
                       id="totalSalesEndDate"
                       value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
+                      onChange={handleEndDateChange}
                       className="w-full bg-brand-header dark:bg-[#1F2937] border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white"
                   />
                   {endDate && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDisplayDate(endDate)}</p>}
